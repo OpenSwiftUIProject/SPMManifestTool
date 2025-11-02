@@ -78,87 +78,52 @@ sed -n "1,${START_LINE}p" "$TARGET_FILE" > "$TEMP_BEFORE"
 # Extract content from and including end marker to end of file
 sed -n "${END_LINE},\$p" "$TARGET_FILE" > "$TEMP_AFTER"
 
-# Extract content from MARK: - Env Manager to end of file and transform for Package.swift
+# Process EnvManager.swift content:
+# 1. Remove #if canImport(PackageDescription)'s else branch and the if/endif directives
+# 2. Keep only the if-branch code (PackageDescription branch)
+# 3. Keep all other content as-is (public, nonisolated(unsafe), etc.)
 awk '
-    BEGIN { found_mark=0; skip_func=0; brace_count=0 }
+    BEGIN {
+        if_stack[0] = 0
+        stack_depth = 0
+        skip = 0
+    }
 
-    # Find the MARK: - Env Manager and start processing
-    /^\/\/ MARK: - Env Manager$/ { found_mark=1 }
+    # Handle #if canImport(PackageDescription) - enter conditional block, keep if branch
+    /^[ \t]*#if canImport\(PackageDescription\)/ {
+        stack_depth++
+        if_stack[stack_depth] = 1  # Mark as in if-branch
+        next
+    }
 
-    # Only process after we found the mark
-    found_mark {
-        # Add @unchecked Sendable conformance to EnvManager class
-        if ($0 ~ /^(public )?final class EnvManager/) {
-            gsub(/public /, "")
-            gsub(/final class EnvManager \{/, "final class EnvManager: @unchecked Sendable {")
+    # Handle #else - switch to else branch, start skipping
+    /^[ \t]*#else$/ {
+        if (stack_depth > 0 && if_stack[stack_depth] == 1) {
+            if_stack[stack_depth] = 2  # Mark as in else-branch (skip)
+        }
+        next
+    }
+
+    # Handle #endif - exit conditional block
+    /^[ \t]*#endif$/ {
+        if (stack_depth > 0) {
+            stack_depth--
+        }
+        next
+    }
+
+    # Skip lines when in else-branch
+    {
+        skip = 0
+        for (i = 1; i <= stack_depth; i++) {
+            if (if_stack[i] == 2) {
+                skip = 1
+                break
+            }
+        }
+        if (!skip) {
             print
-            next
         }
-
-        # Skip environmentProvider field
-        if ($0 ~ /private var environmentProvider:/) { next }
-
-        # Skip setEnvironmentProvider function
-        if ($0 ~ /func setEnvironmentProvider/) {
-            skip_func=1
-            brace_count=0
-            next
-        }
-
-        # Handle skipping function body
-        if (skip_func) {
-            if ($0 ~ /{/) brace_count++
-            if ($0 ~ /}/) {
-                brace_count--
-                if (brace_count < 0) skip_func=0
-            }
-            next
-        }
-
-        # Simplify init() to empty body
-        if ($0 ~ /private init\(\) \{/) {
-            print "    private init() {}"
-            # Skip until end of init
-            brace_count=1
-            while (getline) {
-                if ($0 ~ /{/) brace_count++
-                if ($0 ~ /}/) {
-                    brace_count--
-                    if (brace_count == 0) break
-                }
-            }
-            next
-        }
-
-        # Simplify reset() function
-        if ($0 ~ /func reset\(\) \{/) {
-            print "    func reset() {"
-            print "        domains.removeAll()"
-            print "        includeFallbackToRawKey = false"
-            print "    }"
-            # Skip until end of reset
-            brace_count=1
-            while (getline) {
-                if ($0 ~ /{/) brace_count++
-                if ($0 ~ /}/) {
-                    brace_count--
-                    if (brace_count == 0) break
-                }
-            }
-            next
-        }
-
-        # Remove public keyword and nonisolated(unsafe)
-        gsub(/public /, "")
-        gsub(/nonisolated\(unsafe\) /, "")
-
-        # Transform environmentProvider.value(forKey: key) to Context.environment[key]
-        if ($0 ~ /environmentProvider\.value\(forKey:/) {
-            gsub(/environmentProvider\.value\(forKey: /, "Context.environment[")
-            gsub(/\)/, "]")
-        }
-
-        print
     }
 ' "$SOURCE_FILE" > "$TEMP_CONTENT"
 

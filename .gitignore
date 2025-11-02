@@ -28,3 +28,6 @@ Package.resolved
 *.swp
 *.swo
 *~
+
+# Scripts
+sync_targets.txt
