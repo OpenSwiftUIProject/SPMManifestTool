@@ -22,8 +22,6 @@ public struct ProcessEnvironmentProvider: EnvironmentProvider {
 }
 #endif
 
-// MARK: - Env Manager
-
 public final class EnvManager {
     nonisolated(unsafe) public static let shared = EnvManager()
 
