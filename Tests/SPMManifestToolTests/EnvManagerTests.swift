@@ -48,6 +48,7 @@ struct EnvManagerTests {
         mock.set("1", forKey: "TEST_BOOL")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envBoolValue(rawKey: "TEST_BOOL", searchInDomain: false)
@@ -63,6 +64,7 @@ struct EnvManagerTests {
         mock.set("0", forKey: "TEST_BOOL")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envBoolValue(rawKey: "TEST_BOOL", searchInDomain: false)
@@ -78,6 +80,7 @@ struct EnvManagerTests {
         mock.set("invalid", forKey: "TEST_BOOL")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envBoolValue(rawKey: "TEST_BOOL", default: true, searchInDomain: false)
@@ -92,6 +95,7 @@ struct EnvManagerTests {
         let mock = MockEnvironmentProvider()
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envBoolValue(rawKey: "NONEXISTENT", default: true, searchInDomain: false)
@@ -107,6 +111,7 @@ struct EnvManagerTests {
         mock.set("2024", forKey: "TEST_INT")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envIntValue(rawKey: "TEST_INT", searchInDomain: false)
@@ -122,6 +127,7 @@ struct EnvManagerTests {
         mock.set("not-a-number", forKey: "TEST_INT")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envIntValue(rawKey: "TEST_INT", default: 42, searchInDomain: false)
@@ -136,6 +142,7 @@ struct EnvManagerTests {
         let mock = MockEnvironmentProvider()
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envIntValue(rawKey: "NONEXISTENT", default: 100, searchInDomain: false)
@@ -151,6 +158,7 @@ struct EnvManagerTests {
         mock.set("/usr/local/bin", forKey: "TEST_PATH")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envStringValue(rawKey: "TEST_PATH", searchInDomain: false)
@@ -165,6 +173,7 @@ struct EnvManagerTests {
         let mock = MockEnvironmentProvider()
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envStringValue(rawKey: "NONEXISTENT", default: "/default/path", searchInDomain: false)
@@ -179,6 +188,7 @@ struct EnvManagerTests {
         let mock = MockEnvironmentProvider()
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.envStringValue(rawKey: "NONEXISTENT", searchInDomain: false)
@@ -194,6 +204,7 @@ struct EnvManagerTests {
         mock.set("domain-value", forKey: "TESTDOMAIN_MY_VAR")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
         manager.register(domain: "TestDomain")
 
@@ -211,6 +222,7 @@ struct EnvManagerTests {
         mock.set("second-value", forKey: "SECOND_MY_VAR")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
         manager.register(domain: "First")
         manager.register(domain: "Second")
@@ -221,15 +233,17 @@ struct EnvManagerTests {
         mock.clear()
     }
 
-    @Test("Domain search - fallback to raw key")
+    @Test("Domain search - fallback to raw key with includeFallbackToRawKey")
     @MainActor
     func testDomainSearchFallback() {
         let mock = MockEnvironmentProvider()
         mock.set("raw-value", forKey: "MY_VAR")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
         manager.register(domain: "TestDomain")
+        manager.includeFallbackToRawKey = true // Enable fallback to raw key
 
         let result = manager.envStringValue(rawKey: "MY_VAR", searchInDomain: true)
         #expect(result == "raw-value")
@@ -245,6 +259,7 @@ struct EnvManagerTests {
         mock.set("raw-value", forKey: "MY_VAR")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
         manager.register(domain: "TestDomain")
 
@@ -261,6 +276,7 @@ struct EnvManagerTests {
         mock.set("temp-value", forKey: "TEMPDOMAIN_MY_VAR")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
 
         let result = manager.withDomain("TempDomain") {
@@ -284,6 +300,7 @@ struct EnvManagerTests {
         mock.set("temp-value", forKey: "TEMPDOMAIN_MY_VAR")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
         manager.register(domain: "BaseDomain")
 
@@ -307,6 +324,7 @@ struct EnvManagerTests {
         mock.set("uppercase-value", forKey: "TESTDOMAIN_MY_VAR")
 
         let manager = EnvManager.shared
+        manager.reset()
         manager.setEnvironmentProvider(mock)
         manager.register(domain: "testdomain") // lowercase
 
@@ -326,6 +344,7 @@ struct EnvManagerConvenienceFunctionsTests {
         let mock = MockEnvironmentProvider()
         mock.set("1", forKey: "TEST_BOOL")
 
+        EnvManager.shared.reset()
         EnvManager.shared.setEnvironmentProvider(mock)
 
         let result = envBoolValue("TEST_BOOL", default: false, searchInDomain: false)
@@ -340,6 +359,7 @@ struct EnvManagerConvenienceFunctionsTests {
         let mock = MockEnvironmentProvider()
         mock.set("42", forKey: "TEST_INT")
 
+        EnvManager.shared.reset()
         EnvManager.shared.setEnvironmentProvider(mock)
 
         let result = envIntValue("TEST_INT", default: 0, searchInDomain: false)
@@ -354,6 +374,7 @@ struct EnvManagerConvenienceFunctionsTests {
         let mock = MockEnvironmentProvider()
         mock.set("test-value", forKey: "TEST_STRING")
 
+        EnvManager.shared.reset()
         EnvManager.shared.setEnvironmentProvider(mock)
 
         let result = envStringValue("TEST_STRING", default: "default", searchInDomain: false)
@@ -367,6 +388,7 @@ struct EnvManagerConvenienceFunctionsTests {
     func testEnvStringValueConvenienceWithoutDefault() {
         let mock = MockEnvironmentProvider()
 
+        EnvManager.shared.reset()
         EnvManager.shared.setEnvironmentProvider(mock)
 
         let result = envStringValue("NONEXISTENT", searchInDomain: false)

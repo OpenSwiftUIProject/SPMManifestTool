@@ -1,23 +1,9 @@
-// EnvManager.swift
-// SPMManifestTool
-
-import Foundation
-
-#if canImport(PackageDescription)
-import PackageDescription
-#endif
-
-// MARK: - Environment Provider Protocol
-
-/// Protocol for accessing environment variables
-/// This allows for testing with mock environments
 public protocol EnvironmentProvider {
     func value(forKey key: String) -> String?
 }
 
 #if canImport(PackageDescription)
-/// Default environment provider using PackageDescription.Context
-@MainActor
+import PackageDescription
 public struct PackageContextEnvironmentProvider: EnvironmentProvider {
     public init() {}
 
@@ -25,9 +11,8 @@ public struct PackageContextEnvironmentProvider: EnvironmentProvider {
         Context.environment[key]
     }
 }
-#endif
-
-/// Process environment provider for testing
+#else
+import Foundation
 public struct ProcessEnvironmentProvider: EnvironmentProvider {
     public init() {}
 
@@ -35,29 +20,41 @@ public struct ProcessEnvironmentProvider: EnvironmentProvider {
         ProcessInfo.processInfo.environment[key]
     }
 }
+#endif
 
 // MARK: - Env Manager
 
-@MainActor
 public final class EnvManager {
-    public static let shared = EnvManager()
+    nonisolated(unsafe) public static let shared = EnvManager()
 
     private var domains: [String] = []
     private var environmentProvider: EnvironmentProvider
 
-    #if canImport(PackageDescription)
+    /// When true, append raw key as fallback when searching in domains
+    public var includeFallbackToRawKey: Bool = false
+
     private init() {
+        #if canImport(PackageDescription)
         self.environmentProvider = PackageContextEnvironmentProvider()
-    }
-    #else
-    private init() {
+        #else
         self.environmentProvider = ProcessEnvironmentProvider()
+        #endif
     }
-    #endif
 
     /// Set a custom environment provider (useful for testing)
     public func setEnvironmentProvider(_ provider: EnvironmentProvider) {
         self.environmentProvider = provider
+    }
+
+    /// Reset domains and environment provider (useful for testing)
+    public func reset() {
+        domains.removeAll()
+        includeFallbackToRawKey = false
+        #if canImport(PackageDescription)
+        self.environmentProvider = PackageContextEnvironmentProvider()
+        #else
+        self.environmentProvider = ProcessEnvironmentProvider()
+        #endif
     }
 
     public func register(domain: String) {
@@ -70,24 +67,16 @@ public final class EnvManager {
         return try perform()
     }
 
-    private func envValue<T>(
-        rawKey: String,
-        default defaultValue: T?,
-        searchInDomain: Bool,
-        parser: (String) -> T?
-    ) -> T? {
+    private func envValue<T>(rawKey: String, default defaultValue: T?, searchInDomain: Bool, parser: (String) -> T?) -> T? {
         func parseEnvValue(_ key: String) -> (String, T)? {
-            guard let value = environmentProvider.value(forKey: key) else {
-                return nil
-            }
-            guard let result = parser(value) else {
-                return nil
-            }
+            guard let value = environmentProvider.value(forKey: key),
+                  let result = parser(value) else { return nil }
             return (value, result)
         }
-        let keys: [String] = searchInDomain
-            ? domains.map { "\($0.uppercased())_\(rawKey)" }
-            : [rawKey]
+        var keys: [String] = searchInDomain ? domains.map { "\($0.uppercased())_\(rawKey)" } : []
+        if !searchInDomain || includeFallbackToRawKey {
+            keys.append(rawKey)
+        }
         for key in keys {
             if let (value, result) = parseEnvValue(key) {
                 print("[Env] \(key)=\(value) -> \(result)")
@@ -120,24 +109,18 @@ public final class EnvManager {
     }
 }
 
-// MARK: - Convenience Functions
-
-@MainActor
 public func envBoolValue(_ key: String, default defaultValue: Bool = false, searchInDomain: Bool = true) -> Bool {
     EnvManager.shared.envBoolValue(rawKey: key, default: defaultValue, searchInDomain: searchInDomain)!
 }
 
-@MainActor
 public func envIntValue(_ key: String, default defaultValue: Int = 0, searchInDomain: Bool = true) -> Int {
     EnvManager.shared.envIntValue(rawKey: key, default: defaultValue, searchInDomain: searchInDomain)!
 }
 
-@MainActor
 public func envStringValue(_ key: String, default defaultValue: String, searchInDomain: Bool = true) -> String {
     EnvManager.shared.envStringValue(rawKey: key, default: defaultValue, searchInDomain: searchInDomain)!
 }
 
-@MainActor
 public func envStringValue(_ key: String, searchInDomain: Bool = true) -> String? {
     EnvManager.shared.envStringValue(rawKey: key, searchInDomain: searchInDomain)
 }
